@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIGITS — Cotation projet digital</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #185FA5;
+    --blue-bg: #E6F1FB;
+    --green:   #3B6D11;
+    --green-bg:#EAF3DE;
+    --amber:   #BA7517;
+    --amber-bg:#FAEEDA;
+    --red:     #A32D2D;
+    --red-bg:  #FCEBEB;
+    --border:  #E2E0D8;
+    --surface: #F9F8F5;
+    --card:    #FFFFFF;
+    --text:    #1A1A18;
+    --muted:   #6B6B65;
+    --radius:  10px;
+    --shadow:  0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 24px 16px 48px;
+  }
+
+  .page { max-width: 860px; margin: 0 auto; }
+
+  /* Header */
+  .header { margin-bottom: 28px; }
+  .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--text); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; letter-spacing: -1px; flex-shrink: 0;
+  }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .subtitle { font-size: 13px; color: var(--muted); max-width: 560px; }
+
+  /* Form fields */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 580px) { .fields { grid-template-columns: 1fr; } }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input, .field textarea {
+    width: 100%; padding: 9px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-family: inherit; font-size: 14px; color: var(--text);
+    background: var(--card);
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .field textarea { resize: vertical; min-height: 72px; }
+  .field input:focus, .field textarea:focus { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+
+  /* Result bar */
+  .result-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px;
+    margin-bottom: 20px; box-shadow: var(--shadow);
+  }
+  .result-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .score-display { display: flex; align-items: baseline; gap: 4px; }
+  .score-big { font-size: 42px; font-weight: 700; line-height: 1; letter-spacing: -2px; }
+  .score-denom { font-size: 18px; color: var(--muted); }
+  .level-chip {
+    padding: 5px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.1px;
+  }
+  .progress-wrap { margin-bottom: 4px; position: relative; }
+  .progress-bg { height: 8px; background: #EDEBE5; border-radius: 999px; overflow: visible; position: relative; }
+  .progress-fg { height: 100%; border-radius: 999px; transition: width 0.35s cubic-bezier(.4,0,.2,1), background 0.35s; }
+  .thresholds { display: flex; position: relative; height: 18px; font-size: 10px; color: var(--muted); }
+  .th { position: absolute; transform: translateX(-50%); }
+  .th::before { content: ''; display: block; width: 1px; height: 5px; background: var(--border); margin: 0 auto 2px; }
+  .level-desc { font-size: 13px; color: var(--muted); line-height: 1.55; margin-top: 10px; }
+  .level-desc strong { color: var(--text); }
+
+  /* Mini breakdown */
+  .mini-breakdown { display: flex; gap: 8px; margin-top: 14px; }
+  .mini-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .mini-track { width: 100%; height: 5px; background: #EDEBE5; border-radius: 999px; overflow: hidden; }
+  .mini-fill { height: 100%; border-radius: 999px; transition: width 0.35s; }
+  .mini-lbl { font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .mini-val { font-size: 10px; color: var(--muted); }
+
+  /* Criteria grid */
+  .criteria-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 20px; }
+
+  .crit-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow); transition: border-color 0.15s;
+  }
+  .crit-card.active { border-color: var(--c-color); }
+
+  .crit-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+  .crit-icon {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .crit-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .crit-q { font-size: 12px; color: var(--muted); }
+
+  .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  input[type=range] {
+    flex: 1; height: 4px; border-radius: 999px;
+    -webkit-appearance: none; appearance: none;
+    cursor: pointer; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--c-color, #185FA5);
+    border: 2px solid white; box-shadow: 0 0 0 1px var(--c-color, #185FA5);
+    cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--c-color, #185FA5); border: 2px solid white;
+    cursor: pointer;
+  }
+  .val-pill {
+    min-width: 34px; text-align: center; padding: 2px 8px;
+    border-radius: 999px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--surface);
+  }
+
+  .level-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .lchip {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--border); cursor: pointer; background: var(--card);
+    color: var(--muted); transition: all 0.12s; white-space: nowrap;
+  }
+  .lchip:hover { background: var(--surface); border-color: #bbb; }
+  .lchip.on { font-weight: 600; }
+
+  /* Submit */
+  .submit-section { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn-submit {
+    padding: 11px 28px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    background: var(--text); color: #fff;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn-submit:hover { opacity: 0.88; }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-reset {
+    padding: 11px 20px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card);
+    font-family: inherit; font-size: 13px; color: var(--muted); cursor: pointer;
+  }
+  .btn-reset:hover { background: var(--surface); }
+
+  .status-msg { font-size: 13px; padding: 8px 14px; border-radius: 8px; }
+  .status-msg.ok { background: var(--green-bg); color: var(--green); }
+  .status-msg.err { background: var(--red-bg); color: var(--red); }
+  .status-msg.sending { background: var(--blue-bg); color: var(--blue); }
+
+  /* Config note */
+  .config-note {
+    margin-top: 28px; padding: 14px 18px;
+    background: #FFFBF0; border: 1px solid #F0D080; border-radius: 8px;
+    font-size: 12px; color: #7A5C00; line-height: 1.6;
+  }
+  .config-note strong { display: block; margin-bottom: 4px; }
+  code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">D</div>
+      <h1>DIGITS — Cotation projet digital</h1>
+    </div>
+    <p class="subtitle">Évaluez votre idée en 2 minutes pour identifier le bon niveau de développement et d'accompagnement.</p>
+  </div>
+
+  <!-- Requester fields -->
+  <div class="fields">
+    <div class="field">
+      <label>Votre nom</label>
+      <input type="text" id="requesterName" placeholder="Prénom Nom" />
+    </div>
+    <div class="field">
+      <label>Nom du projet</label>
+      <input type="text" id="projectName" placeholder="Ex : Suivi erreurs EDI automatisé" />
+    </div>
+    <div class="field" style="grid-column: 1 / -1;">
+      <label>Description rapide</label>
+      <textarea id="projectDesc" placeholder="En 2–3 phrases : quel problème, quelle solution envisagée, qui est concerné ?"></textarea>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard">
+    <div class="result-row">
+      <div class="score-display">
+        <span class="score-big" id="scoreVal">0</span>
+        <span class="score-denom">/100</span>
+      </div>
+      <span class="level-chip" id="levelChip" style="background:#F1EFE8; color:#5F5E5A;">— À évaluer</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bg">
+        <div class="progress-fg" id="progressFg" style="width:0%; background:#888;"></div>
+      </div>
+      <div class="thresholds">
+        <div class="th" style="left:15%"><span>15</span></div>
+        <div class="th" style="left:35%"><span>35</span></div>
+        <div class="th" style="left:65%"><span>65</span></div>
+      </div>
+    </div>
+    <div class="mini-breakdown" id="miniBreakdown"></div>
+    <p class="level-desc" id="levelDesc">Renseignez les critères ci-dessous pour obtenir votre score.</p>
+  </div>
+
+  <!-- Criteria -->
+  <div class="criteria-grid" id="criteriaGrid"></div>
+
+  <hr class="divider">
+
+  <!-- Submit -->
+  <div class="submit-section">
+    <button class="btn-submit" id="btnSubmit" onclick="submitScoring()">Envoyer au Digital Ambassador ↗</button>
+    <button class="btn-reset" onclick="resetAll()">Réinitialiser</button>
+    <span id="statusMsg"></span>
+  </div>
+
+  <div class="config-note" id="configNote">
+    <strong>⚙ Fonctionnement</strong>
+    Ce formulaire écrit directement dans la liste SharePoint <code>[DA] Digital Cotation</code> sur le site SP&DIM via l'API REST SharePoint.
+    Il doit être hébergé comme WebPart sur le même site SharePoint pour que l'authentification Volvo soit automatique.
+    Le flow Power Automate se déclenche ensuite sur chaque nouvelle ligne créée dans la liste (trigger gratuit : "When an item is created").
+  </div>
+
+</div>
+
+<script>
+// Configuration SharePoint
+const SP_SITE_URL = "https://volvogroup.sharepoint.com/sites/unit-sp-dim-lyon-rmea-portal";
+const SP_LIST_NAME = "[DA] Digital Cotation";
+
+const CRITERIA = [
+  {
+    id:"D", label:"Data & sources", icon:"📊",
+    q:"Combien de sources / systèmes différents ?",
+    max:20, color:"#185FA5", bg:"#E6F1FB",
+    levels:["1 source interne simple","2–3 sources hétérogènes","Croisement multi-SI","API, lakehouse ou temps réel"],
+    scores:[0,5,12,20]
+  },
+  {
+    id:"I", label:"Impact utilisateurs", icon:"👥",
+    q:"Combien de personnes affectées ?",
+    max:15, color:"#3B6D11", bg:"#EAF3DE",
+    levels:["Usage perso / 1–2 users","Petite équipe (3–10)","Périmètre site / département","Multi-sites ou externe"],
+    scores:[0,4,9,15]
+  },
+  {
+    id:"G", label:"Gouvernance & données", icon:"🔒",
+    q:"Niveau de sensibilité / conformité requis ?",
+    max:15, color:"#BA7517", bg:"#FAEEDA",
+    levels:["Données non-sensibles internes","Données métier partagées","Données fournisseurs / clients","RGPD, auditabilité, export control"],
+    scores:[0,4,9,15]
+  },
+  {
+    id:"IS", label:"Intégration SI", icon:"🔌",
+    q:"Connexion avec le SI existant ?",
+    max:20, color:"#533AB7", bg:"#EEEDFE",
+    levels:["Fichiers locaux / Excel autonome","SharePoint / Power Platform","Connecteur SAP / API interne","Interfaçage ERP critique / MDM"],
+    scores:[0,5,12,20]
+  },
+  {
+    id:"T", label:"Temps & charge", icon:"⏱",
+    q:"Effort estimé de développement ?",
+    max:15, color:"#0F6E56", bg:"#E1F5EE",
+    levels:["< 1 jour","1–5 jours","5–20 jours","> 20 jours / dédié IT"],
+    scores:[0,4,9,15]
+  },
+  {
+    id:"S", label:"Vocation de la solution", icon:"📈",
+    q:"Usage ponctuel ou stratégique ?",
+    max:10, color:"#993C1D", bg:"#FAECE7",
+    levels:["Usage ponctuel","Récurrent mais limité","Industrialisation prévue","Socle stratégique long terme"],
+    scores:[0,2,6,10]
+  },
+  {
+    id:"R", label:"Risque opérationnel", icon:"⚠️",
+    q:"Impact en cas de dysfonctionnement ?",
+    max:5, color:"#993556", bg:"#FBEAF0",
+    levels:["Zéro impact","Gêne mineure","Risque qualité / délai","Arrêt production / audit"],
+    scores:[0,1,3,5]
+  }
+];
+
+let vals = CRITERIA.map(() => 0);
+
+function getLevel(score) {
+  if (score < 15) return { num:1, label:"Niveau 1 — Do It Yourself", color:"#3B6D11", bg:"#EAF3DE",
+    desc:"<strong>Exécution autonome.</strong> Aucun processus formel requis. Utilisez les outils à disposition (Excel, Power Query, Power Automate simple). Durée typique : moins d'une semaine." };
+  if (score < 35) return { num:2, label:"Niveau 2 — Guided Self-Service", color:"#185FA5", bg:"#E6F1FB",
+    desc:"<strong>Accompagnement ponctuel d'un Digital Ambassador.</strong> Le demandeur reste maître du projet avec un cadrage initial (choix d'outil, architecture data). Déclaration dans le backlog citoyen." };
+  if (score < 65) return { num:3, label:"Niveau 3 — Projet mandaté", color:"#BA7517", bg:"#FAEEDA",
+    desc:"<strong>Pilotage par le Digital Ambassador avec sponsor métier.</strong> Fiche projet obligatoire, revue en Digital Board. Livrable documenté et testé. DSI en consultation si nécessaire." };
+  return { num:4, label:"Niveau 4 — Escalade IT", color:"#A32D2D", bg:"#FCEBEB",
+    desc:"<strong>Transfert à la DSI ou engagement d'un prestataire.</strong> Cadrage AMOA requis. Développement IT complet ou POC borné avec critères de validation. Gouvernance formelle (COPIL, COPROJ)." };
+}
+
+function render() {
+  const grid = document.getElementById("criteriaGrid");
+  grid.innerHTML = "";
+  CRITERIA.forEach((c, i) => {
+    const card = document.createElement("div");
+    card.className = "crit-card";
+    card.style.setProperty("--c-color", c.color);
+    if (vals[i] > 0) card.classList.add("active");
+
+    const chipHtml = c.levels.map((lbl, j) => {
+      const on = vals[i] === c.scores[j];
+      return `<span class="lchip${on?" on":""}" style="${on?`background:${c.bg};color:${c.color};border-color:${c.color};`:""}" onclick="setChip(${i},${j})">${lbl}</span>`;
+    }).join("");
+
+    // Build gradient for range
+    const pct = c.max > 0 ? (vals[i]/c.max)*100 : 0;
+    const trackStyle = `background: linear-gradient(to right, ${c.color} 0%, ${c.color} ${pct}%, #EDEBE5 ${pct}%, #EDEBE5 100%)`;
+
+    card.innerHTML = `
+      <div class="crit-head">
+        <div class="crit-icon" style="background:${c.bg}">${c.icon}</div>
+        <div>
+          <div class="crit-name">${c.label} <span style="font-weight:400;color:var(--muted);font-size:11px;">/${c.max} pts</span></div>
+          <div class="crit-q">${c.q}</div>
+        </div>
+      </div>
+      <div class="slider-row">
+        <input type="range" id="slider_${i}" min="0" max="${c.max}" value="${vals[i]}" step="1"
+          style="${trackStyle}"
+          oninput="onSlider(${i}, this)">
+        <span class="val-pill" id="pill_${i}" style="color:${c.color};border-color:${c.color}">${vals[i]}</span>
+      </div>
+      <div class="level-chips">${chipHtml}</div>
+    `;
+    grid.appendChild(card);
+  });
+  updateResult();
+}
+
+function onSlider(i, el) {
+  vals[i] = parseInt(el.value);
+  const c = CRITERIA[i];
+  const pct = c.max > 0 ? (vals[i]/c.max)*100 : 0;
+  el.style.background = `linear-gradient(to right, ${c.color} 0%, ${c.color} ${pct}%, #EDEBE5 ${pct}%, #EDEBE5 100%)`;
+  document.getElementById("pill_"+i).textContent = vals[i];
+  // Update chips
+  const card = el.closest(".crit-card");
+  card.querySelectorAll(".lchip").forEach((chip, j) => {
+    const on = vals[i] === c.scores[j];
+    chip.className = "lchip" + (on?" on":"");
+    chip.style.cssText = on ? `background:${c.bg};color:${c.color};border-color:${c.color};` : "";
+  });
+  if (vals[i] > 0) card.classList.add("active");
+  else card.classList.remove("active");
+  updateResult();
+}
+
+function setChip(i, j) {
+  vals[i] = CRITERIA[i].scores[j];
+  render();
+}
+
+function updateResult() {
+  const total = vals.reduce((a,b)=>a+b,0);
+  const lv = getLevel(total);
+  document.getElementById("scoreVal").textContent = total;
+  document.getElementById("scoreVal").style.color = lv.color;
+  const chip = document.getElementById("levelChip");
+  chip.textContent = lv.label;
+  chip.style.cssText = `background:${lv.bg};color:${lv.color};`;
+  const fg = document.getElementById("progressFg");
+  fg.style.width = total + "%";
+  fg.style.background = lv.color;
+  document.getElementById("levelDesc").innerHTML = lv.desc;
+
+  // Mini breakdown
+  document.getElementById("miniBreakdown").innerHTML = CRITERIA.map((c,i)=>{
+    const p = c.max>0?(vals[i]/c.max)*100:0;
+    return `<div class="mini-item">
+      <div class="mini-val">${vals[i]}</div>
+      <div class="mini-track"><div class="mini-fill" style="width:${p}%;background:${c.color}"></div></div>
+      <div class="mini-lbl">${c.id}</div>
+    </div>`;
+  }).join("");
+}
+
+async function getRequestDigest() {
+  const res = await fetch(`${SP_SITE_URL}/_api/contextinfo`, {
+    method: "POST",
+    headers: { "Accept": "application/json;odata=verbose" },
+    credentials: "include"
+  });
+  const data = await res.json();
+  return data.d.GetContextWebInformation.FormDigestValue;
+}
+
+async function submitScoring() {
+  const name = document.getElementById("requesterName").value.trim();
+  const project = document.getElementById("projectName").value.trim();
+  const desc = document.getElementById("projectDesc").value.trim();
+  const msg = document.getElementById("statusMsg");
+
+  if (!name || !project) {
+    msg.className = "status-msg err";
+    msg.textContent = "Veuillez renseigner votre nom et le nom du projet.";
+    return;
+  }
+
+  const total = vals.reduce((a,b)=>a+b,0);
+  const lv = getLevel(total);
+
+  msg.className = "status-msg sending";
+  msg.textContent = "Envoi en cours…";
+  document.getElementById("btnSubmit").disabled = true;
+
+  try {
+    // 1. Récupérer le digest SharePoint (token CSRF)
+    const digest = await getRequestDigest();
+
+    // 2. Construire l'item à écrire dans la liste
+    const item = {
+      "__metadata": { "type": "SP.Data.[DA]_x0020_Digital_x0020_CotationListItem" },
+      "Title": project,
+      "Requester": name,
+      "ProjectName": project,
+      "Description": desc,
+      "Score": total,
+      "Level": lv.label,
+      "LevelNum": lv.num,
+      "DetailD":  vals[0],
+      "DetailI":  vals[1],
+      "DetailG":  vals[2],
+      "DetailIS": vals[3],
+      "DetailT":  vals[4],
+      "DetailS":  vals[5],
+      "DetailR":  vals[6]
+    };
+
+    // 3. POST vers la liste SharePoint via REST API
+    const listUrl = `${SP_SITE_URL}/_api/web/lists/getbytitle('${encodeURIComponent(SP_LIST_NAME)}')/items`;
+    const res = await fetch(listUrl, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Accept": "application/json;odata=verbose",
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": digest
+      },
+      body: JSON.stringify(item)
+    });
+
+    if (res.ok) {
+      msg.className = "status-msg ok";
+      msg.textContent = "✓ Cotation enregistrée — le Digital Ambassador a été notifié.";
+      // Reset après 3s
+      setTimeout(() => {
+        document.getElementById("btnSubmit").disabled = false;
+      }, 3000);
+    } else {
+      const err = await res.json().catch(()=>({}));
+      const errMsg = err?.error?.message?.value || ("HTTP " + res.status);
+      // Erreur type metadata → donner instruction claire
+      if (res.status === 400) {
+        msg.className = "status-msg err";
+        msg.textContent = "Erreur 400 : vérifiez que les colonnes de la liste correspondent exactement au guide (noms sensibles à la casse).";
+      } else {
+        throw new Error(errMsg);
+      }
+    }
+  } catch(e) {
+    msg.className = "status-msg err";
+    msg.textContent = "Erreur d'envoi : " + e.message + ". Assurez-vous d'être connecté à SharePoint Volvo.";
+    document.getElementById("btnSubmit").disabled = false;
+  }
+}
+
+function resetAll() {
+  vals = CRITERIA.map(()=>0);
+  document.getElementById("requesterName").value = "";
+  document.getElementById("projectName").value = "";
+  document.getElementById("projectDesc").value = "";
+  document.getElementById("statusMsg").textContent = "";
+  document.getElementById("statusMsg").className = "";
+  document.getElementById("btnSubmit").disabled = false;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
