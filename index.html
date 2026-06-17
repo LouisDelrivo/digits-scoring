@@ -243,17 +243,15 @@
 
   <div class="config-note" id="configNote">
     <strong>⚙ Fonctionnement</strong>
-    Ce formulaire écrit directement dans la liste SharePoint <code>[DA] Digital Cotation</code> sur le site SP&DIM via l'API REST SharePoint.
-    Il doit être hébergé comme WebPart sur le même site SharePoint pour que l'authentification Volvo soit automatique.
-    Le flow Power Automate se déclenche ensuite sur chaque nouvelle ligne créée dans la liste (trigger gratuit : "When an item is created").
+    Ce formulaire envoie la cotation au serveur DIGITS (<code>digits_server.py</code>) qui tourne sur la VM Volvo.
+    Le serveur relaie ensuite vers Teams via webhook. Assurez-vous que le script Python est bien démarré avant d'utiliser le formulaire.
   </div>
 
 </div>
 
 <script>
-// Configuration SharePoint
-const SP_SITE_URL = "https://volvogroup.sharepoint.com/sites/unit-operational-development-team";
-const SP_LIST_NAME = "[DA] Digital Cotation";
+// Configuration serveur Flask
+const FLASK_URL = "http://10.213.249.149:5000/submit";
 
 const CRITERIA = [
   {
@@ -406,16 +404,6 @@ function updateResult() {
   }).join("");
 }
 
-async function getRequestDigest() {
-  const res = await fetch(`${SP_SITE_URL}/_api/contextinfo`, {
-    method: "POST",
-    headers: { "Accept": "application/json;odata=verbose" },
-    credentials: "include"
-  });
-  const data = await res.json();
-  return data.d.GetContextWebInformation.FormDigestValue;
-}
-
 async function submitScoring() {
   const name = document.getElementById("requesterName").value.trim();
   const project = document.getElementById("projectName").value.trim();
@@ -431,69 +419,41 @@ async function submitScoring() {
   const total = vals.reduce((a,b)=>a+b,0);
   const lv = getLevel(total);
 
+  const details = {};
+  CRITERIA.forEach((c,i)=>{ details[c.id] = { label: c.label, score: vals[i], max: c.max }; });
+
+  const payload = {
+    requester:   name,
+    project:     project,
+    description: desc,
+    score:       total,
+    level:       lv.label,
+    levelNum:    lv.num,
+    details:     details
+  };
+
   msg.className = "status-msg sending";
   msg.textContent = "Envoi en cours…";
   document.getElementById("btnSubmit").disabled = true;
 
   try {
-    // 1. Récupérer le digest SharePoint (token CSRF)
-    const digest = await getRequestDigest();
-
-    // 2. Construire l'item à écrire dans la liste
-    const item = {
-      "__metadata": { "type": "SP.Data.[DA]_x0020_Digital_x0020_CotationListItem" },
-      "Title": project,
-      "Requester": name,
-      "ProjectName": project,
-      "Description": desc,
-      "Score": total,
-      "Level": lv.label,
-      "LevelNum": lv.num,
-      "DetailD":  vals[0],
-      "DetailI":  vals[1],
-      "DetailG":  vals[2],
-      "DetailIS": vals[3],
-      "DetailT":  vals[4],
-      "DetailS":  vals[5],
-      "DetailR":  vals[6]
-    };
-
-    // 3. POST vers la liste SharePoint via REST API
-    const listUrl = `${SP_SITE_URL}/_api/web/lists/getbytitle('${encodeURIComponent(SP_LIST_NAME)}')/items`;
-    const res = await fetch(listUrl, {
+    const res = await fetch(FLASK_URL, {
       method: "POST",
-      credentials: "include",
-      headers: {
-        "Accept": "application/json;odata=verbose",
-        "Content-Type": "application/json;odata=verbose",
-        "X-RequestDigest": digest
-      },
-      body: JSON.stringify(item)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
     if (res.ok) {
       msg.className = "status-msg ok";
-      msg.textContent = "✓ Cotation enregistrée — le Digital Ambassador a été notifié.";
-      // Reset après 3s
-      setTimeout(() => {
-        document.getElementById("btnSubmit").disabled = false;
-      }, 3000);
+      msg.textContent = "✓ Cotation envoyée — le Digital Ambassador a été notifié.";
     } else {
-      const err = await res.json().catch(()=>({}));
-      const errMsg = err?.error?.message?.value || ("HTTP " + res.status);
-      // Erreur type metadata → donner instruction claire
-      if (res.status === 400) {
-        msg.className = "status-msg err";
-        msg.textContent = "Erreur 400 : vérifiez que les colonnes de la liste correspondent exactement au guide (noms sensibles à la casse).";
-      } else {
-        throw new Error(errMsg);
-      }
+      throw new Error("HTTP " + res.status);
     }
   } catch(e) {
     msg.className = "status-msg err";
-    msg.textContent = "Erreur d'envoi : " + e.message + ". Assurez-vous d'être connecté à SharePoint Volvo.";
-    document.getElementById("btnSubmit").disabled = false;
+    msg.textContent = "Erreur d'envoi : " + e.message + ". Vérifiez que le serveur DIGITS est bien démarré.";
   }
+  document.getElementById("btnSubmit").disabled = false;
 }
 
 function resetAll() {
